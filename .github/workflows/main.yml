@@ -1,4 +1,4 @@
-name: GameHub iOS Build
+name: GameHub Final Build (All-In-One UI)
 
 on:
   push:
@@ -7,20 +7,20 @@ on:
 
 jobs:
   build:
-    name: Generate IPA
+    name: Build GameHub IPA
     runs-on: macos-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate Source Files
+      - name: Prepare Workspace & Assets
         run: |
           mkdir -p GameHub
           
-          # 1. Create Info.plist with necessary permissions for GameHub functionality
+          # 1. Advanced Info.plist (Fixed CFBundleExecutable & Permissions)
           cat <<'EOF' > GameHub/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -35,7 +35,7 @@ jobs:
             <key>CFBundlePackageType</key>
             <string>APPL</string>
             <key>CFBundleShortVersionString</key>
-            <string>1.0.0</string>
+            <string>1.1.0</string>
             <key>CFBundleVersion</key>
             <string>1</string>
             <key>LSRequiresIPhoneOS</key>
@@ -52,12 +52,21 @@ jobs:
               <string>UIInterfaceOrientationLandscapeRight</string>
             </array>
             <key>NSLocalNetworkUsageDescription</key>
-            <string>Required for Cloud Gaming and PC linking.</string>
+            <string>Required to link with PC and Stream Games.</string>
+            <key>GCSupportedGameControllers</key>
+            <array>
+              <dict>
+                <key>ProfileName</key>
+                <string>ExtendedGamepad</string>
+              </dict>
+            </array>
+            <key>GCSupportsControllerUserInterface</key>
+            <true/>
           </dict>
           </plist>
           EOF
 
-          # 2. Create high-performance App Entry Point (SwiftUI)
+          # 2. Comprehensive Gaming UI (SwiftUI)
           cat <<'EOF' > GameHub/App.swift
           import SwiftUI
 
@@ -65,51 +74,78 @@ jobs:
           struct GameHubApp: App {
               var body: some Scene {
                   WindowGroup {
-                      ContentView()
+                      MainDashboardView()
                   }
               }
           }
 
-          struct ContentView: View {
+          struct MainDashboardView: View {
+              let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+              
               var body: some View {
-                  ZStack {
-                      Color.black.ignoresSafeArea()
-                      VStack(spacing: 20) {
-                          Text("GAMEHUB")
-                              .font(.system(size: 48, weight: .black, design: .monospaced))
-                              .foregroundColor(.blue)
+                  NavigationView {
+                      ZStack {
+                          Color(red: 0.05, green: 0.05, blue: 0.1).ignoresSafeArea()
                           
-                          Text("Cloud & Emulator Environment Ready")
-                              .font(.headline)
-                              .foregroundColor(.white)
-                          
-                          HStack {
-                              Circle().fill(Color.green).frame(width: 10, height: 10)
-                              Text("System: Operational").foregroundColor(.green)
+                          VStack(alignment: .leading) {
+                              HStack {
+                                  Text("GAMEHUB").font(.system(size: 32, weight: .black)).foregroundColor(.blue)
+                                  Spacer()
+                                  Circle().fill(Color.green).frame(width: 8, height: 8)
+                                  Text("SERVER: ONLINE").font(.caption).foregroundColor(.green)
+                              }
+                              .padding(.horizontal)
+
+                              ScrollView {
+                                  LazyVGrid(columns: columns, spacing: 20) {
+                                      GameCard(title: "Steam Library", icon: "desktopcomputer")
+                                      GameCard(title: "Cloud Stream", icon: "icloud.fill")
+                                      GameCard(title: "Emulator Mode", icon: "cpu")
+                                      GameCard(title: "Xbox Live", icon: "gamecontroller.fill")
+                                      GameCard(title: "PS Remote", icon: "playstation.logo")
+                                      GameCard(title: "Settings", icon: "gearshape.fill")
+                                  }
+                                  .padding()
+                              }
+                              
+                              Text("Ready for PC-Mobile Bridge Tasks")
+                                  .font(.system(size: 10))
+                                  .foregroundColor(.gray)
+                                  .padding(.leading)
                           }
-                          
-                          Spacer()
-                          
-                          Text("Compatible with PC, PS5 & Xbox Services")
-                              .font(.caption)
-                              .foregroundColor(.gray)
                       }
-                      .padding()
+                      .navigationBarHidden(true)
                   }
+                  .navigationViewStyle(StackNavigationViewStyle())
+              }
+          }
+
+          struct GameCard: View {
+              var title: String
+              var icon: String
+              var body: some View {
+                  VStack {
+                      Image(systemName: icon).font(.largeTitle).foregroundColor(.white)
+                      Text(title).font(.caption2).bold().foregroundColor(.white).padding(.top, 5)
+                  }
+                  .frame(maxWidth: .infinity, minHeight: 100)
+                  .background(Color.white.opacity(0.1))
+                  .cornerRadius(12)
+                  .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blue.opacity(0.3), lineWidth: 1))
               }
           }
           EOF
 
-          # 3. Create placeholder LaunchScreen
+          # 3. Dummy LaunchScreen for stability
           cat <<'EOF' > GameHub/LaunchScreen.swift
           import UIKit
           class LaunchScreen: UIViewController {}
           EOF
 
-      - name: XcodeGen Project
+      - name: Generate Xcode Project
         run: xcodegen generate
 
-      - name: Archive Build
+      - name: Archive and Build
         run: |
           xcodebuild archive \
             -project GameHub.xcodeproj \
@@ -118,18 +154,17 @@ jobs:
             -sdk iphoneos \
             -archivePath build/GameHub.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGNING_REQUIRED=NO
 
-      - name: Package IPA
+      - name: Create Production IPA
         run: |
           mkdir -p build/Payload
           cp -r build/GameHub.xcarchive/Products/Applications/*.app build/Payload/
           cd build
-          zip -qr GameHub_Release.ipa Payload
+          zip -qr GameHub_v1.1_Build.ipa Payload
 
-      - name: Export Artifact
+      - name: Upload Finished Build
         uses: actions/upload-artifact@v4
         with:
-          name: GameHub-iOS-Package
-          path: build/GameHub_Release.ipa
+          name: GameHub-IPA-Package
+          path: build/GameHub_v1.1_Build.ipa
